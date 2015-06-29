@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+    
+    <head>
+        <meta charset="UTF-8">
+        <title>abc</title>
+        <script src="joint.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+        <link rel="stylesheet" href="./joint.css">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    </head>
+    
+    <body>
+        <div id="paper"></div>
+        <script>
+            var row = '<tr><td>aaa</td><td>int</td></tr>';
+            var redrow = '<tr class="redrow" style="color: red;"><td>aaa</td><td>int</td></tr>';
+            
+            var rows1 = [row, row, row, row, redrow, row, row, row].join('');
+            var rows2 = [redrow, row, redrow, row, redrow, row, row, row].join('');
+            var rows3 = [redrow, redrow, redrow, redrow, redrow].join('');
+            
+            var graph = new joint.dia.Graph;
+    		var paper = new joint.dia.Paper({ el: $('#paper'), width: 800, height: 600, gridSize: 1, model: graph });
+            		
+    		// Create a custom element.
+    		// ------------------------
+    		
+    		joint.shapes.html = {};
+    		joint.shapes.html.Element = joint.shapes.basic.Rect.extend({
+    		    defaults: joint.util.deepSupplement({
+    		        type: 'html.Element',
+    		        attrs: {
+    		            rect: { stroke: 'none', 'fill-opacity': 0 }
+    		        }
+    		    }, joint.shapes.basic.Rect.prototype.defaults)
+    		});
+            		
+    		// Create a custom view for that element that displays an HTML div above it.
+    		// -------------------------------------------------------------------------
+    		
+    		joint.shapes.html.ElementView = joint.dia.ElementView.extend({
+    		
+    		    template: [
+    		        '<div class="html-element">',
+    		        '<label></label>', '<br/>',
+    		        '<div class="table-container"><table>',
+    				'<tr><td>name</td><td>type</td></tr>',
+    				'<%= rows %>',
+    				'</table></div>',
+    		        '</div>'
+    		    ].join(''),
+    		
+    		    initialize: function() {
+    		        _.bindAll(this, 'updateBox');
+    		        joint.dia.ElementView.prototype.initialize.apply(this, arguments);
+    		        var rows = [row, row, row, row, redrow, row, row, row].join('');
+                    
+    		        this.$box = $(_.template(this.template)({rows: this.model.get('rows')}));
+    		        // Prevent paper from handling pointerdown.
+    		        this.$box.find('input,select').on('mousedown click', function(evt) { evt.stopPropagation(); });
+
+    		        this.$box.find('.delete').on('click', _.bind(this.model.remove, this.model));
+    		        // Update the box position whenever the underlying model changes.
+    		        this.model.on('change', this.updateBox, this);
+    		        // Remove the box when the model gets removed from the graph.
+    		        this.model.on('remove', this.removeBox, this);
+    		
+    		        this.updateBox();
+    		    },
+    		    render: function() {
+    		        joint.dia.ElementView.prototype.render.apply(this, arguments);
+    		        this.paper.$el.prepend(this.$box);
+    		        this.updateBox();
+    		        return this;
+    		    },
+    		    updateBox: function() {
+    		        // Set the position and dimension of the box so that it covers the JointJS element.
+    		        var bbox = this.model.getBBox();
+    		        // Example of updating the HTML with a data stored in the cell model.
+    		        this.$box.find('label').text(this.model.get('label'));
+    		        this.$box.css({ width: bbox.width, height: bbox.height, left: bbox.x, top: bbox.y, transform: 'rotate(' + (this.model.get('angle') || 0) + 'deg)' });
+    		    },
+    		    removeBox: function(evt) {
+    		        this.$box.remove();
+    		    }
+    		});
+    		
+    		// Create JointJS elements and add them to the graph as usual.
+    		// -----------------------------------------------------------
+    		
+    		var el1 = new joint.shapes.html.Element({ position: { x: 0, y: 0 }, size: { width: 170, height: 200 }, label: 'table A', select: 'one', rows: rows1 });
+    		var el2 = new joint.shapes.html.Element({ position: { x: 630, y: 400 }, size: { width: 170, height: 200 }, label: 'table B', select: 'two', rows:rows2 });
+    		var el3 = new joint.shapes.html.Element({ position: { x: 630, y: 0 }, size: { width: 170, height: 200 }, label: 'table C', select: 'two', rows:rows3 })
+            var l = new joint.dia.Link({
+    		    source: { id: el1.id },
+    		    target: { id: el2.id },
+    		    attrs: { '.connection': { 'stroke-width': 2, stroke: '#34495E' } }
+    		});
+    		
+    		graph.addCells([el1, el2, el3, l]);
+        </script>
+        <style>
+            #paper {
+                position: relative;
+                border: 1px solid gray;
+                display: inline-block;
+                background: transparent;
+                overflow: hidden;
+            }
+            #paper svg {
+                background: transparent;
+            }
+            #paper svg .link {
+                z-index: 2;
+            }
+            .html-element {
+                position: absolute;
+                background: #FFF;
+                /* Make sure events are propagated to the JointJS element so, e.g. dragging works.*/
+                pointer-events: none;
+                -webkit-user-select: none;
+                border: 2px solid #000;
+                padding: 5px;
+                box-sizing: border-box;
+                z-index: 2;
+            }
+            .html-element select,
+            .html-element input,
+            .html-element button,
+            .html-element .table-container {
+                /* Enable interacting with inputs only. */
+                pointer-events: auto;   
+            }
+            .html-element button.delete {
+                color: white;
+                border: none;
+                background-color: #C0392B;
+                border-radius: 20px;
+                width: 15px;
+                height: 15px;
+                line-height: 15px;
+                text-align: middle;
+                position: absolute;
+                top: -15px;
+                left: -15px;
+                padding: 0;
+                margin: 0;
+                font-weight: bold;
+                cursor: pointer;
+            }
+            .html-element button.delete:hover {
+                width: 20px;
+                height: 20px;
+                line-height: 20px;
+            }
+            .html-element select {
+                position: absolute;
+                right: 2px;
+                bottom: 28px;
+            }
+            .html-element input {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                color: #333;
+                padding: 5px;
+                height: 16px;
+            }
+            .html-element label {
+                color: #333;
+                text-shadow: 1px 0 0 lightgray;
+                font-weight: bold;
+            }
+            .html-element span {
+                position: absolute;
+                top: 2px;
+                right: 9px;
+                color: white;
+                font-size: 10px;
+            }
+            .table-container{        
+                height: 150px;
+                overflow-y: auto;
+            }
+            .table-container table{
+                width: 130px;
+                border-collapse: collapse;
+            }
+            .table-container td{
+                border: 1px solid #000;
+                padding-top: 1px;
+                padding-bottom: 1px;
+                padding-left: 2px;
+                padding-right: 2px; 
+            }
+            
+            .link-tools .tool-remove { display: none }
+            .link-tools .tool-options { display: none }
+            .link .marker-arrowhead { display: none }
+        </style>
+    </body>
+
+</html>
